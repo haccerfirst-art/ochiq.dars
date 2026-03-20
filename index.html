@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quiz Clash: Multiplayer Battle</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --bg-dark: #0f172a;
+        --accent-primary: #8b5cf6;
+        --accent-secondary: #ec4899;
+        --glass: rgba(255, 255, 255, 0.05);
+        --glass-border: rgba(255, 255, 255, 0.1);
+      }
+
+      body {
+        font-family: 'Outfit', sans-serif;
+        background-color: var(--bg-dark);
+        color: white;
+        margin: 0;
+        overflow: hidden;
+        height: 100vh;
+        background: radial-gradient(circle at top left, #1e1b4b, #0f172a);
+      }
+
+      h1, h2, h3 {
+        font-family: 'Space Grotesk', sans-serif;
+      }
+
+      .glass {
+        background: var(--glass);
+        backdrop-filter: blur(12px);
+        border: 1px solid var(--glass-border);
+        border-radius: 24px;
+      }
+
+      .neon-glow {
+        box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+      }
+
+      .player-section {
+        transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .player-section::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, transparent, var(--accent-primary), transparent);
+        opacity: 0.5;
+      }
+
+      .answer-btn {
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        transform: translateY(0);
+      }
+
+      .answer-btn:hover:not(:disabled) {
+        transform: translateY(-4px);
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.3);
+      }
+
+      .answer-btn:active:not(:disabled) {
+        transform: translateY(0);
+      }
+
+      .correct-flash {
+        animation: correct-pulse 0.6s ease-out;
+      }
+
+      .wrong-flash {
+        animation: wrong-pulse 0.6s ease-out;
+      }
+
+      @keyframes correct-pulse {
+        0% { background-color: transparent; }
+        50% { background-color: rgba(34, 197, 94, 0.2); }
+        100% { background-color: transparent; }
+      }
+
+      @keyframes wrong-pulse {
+        0% { background-color: transparent; }
+        50% { background-color: rgba(239, 68, 68, 0.2); }
+        100% { background-color: transparent; }
+      }
+
+      .avatar-bounce {
+        animation: bounce 2s infinite ease-in-out;
+      }
+
+      @keyframes bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+      }
+
+      .timer-bar {
+        transition: width 0.1s linear;
+      }
+
+      .confetti {
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        background-color: #f00;
+        animation: fall 3s linear forwards;
+      }
+
+      @keyframes fall {
+        to { transform: translateY(100vh) rotate(360deg); }
+      }
+
+      .hidden { display: none; }
+
+      /* Custom scrollbar */
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+    </style>
+  </head>
+  <body>
+    <!-- Setup Screen -->
+    <div id="setup-screen" class="flex flex-col items-center justify-center min-h-screen p-6">
+      <div class="glass p-10 max-w-4xl w-full text-center neon-glow">
+        <h1 class="text-6xl font-bold mb-4 bg-gradient-to-r from-violet-400 to-pink-400 bg-clip-text text-transparent">QUIZ CLASH</h1>
+        <p class="text-slate-400 mb-10 text-lg">Multiplayer Battle Arena</p>
+        
+        <div class="flex justify-center gap-6 mb-10">
+          <button onclick="setPlayerCount(2)" id="btn-2p" class="px-8 py-4 glass border-2 border-violet-500/50 hover:bg-violet-500/20 rounded-2xl transition-all font-bold text-xl">2 PLAYERS</button>
+          <button onclick="setPlayerCount(3)" id="btn-3p" class="px-8 py-4 glass border-2 border-slate-700 hover:bg-violet-500/20 rounded-2xl transition-all font-bold text-xl">3 PLAYERS</button>
+        </div>
+
+        <div id="player-inputs" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+          <!-- Player inputs will be injected here -->
+        </div>
+
+        <button id="start-btn" onclick="startGame()" class="px-12 py-5 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-2xl font-bold text-2xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-violet-500/20">
+          START BATTLE
+        </button>
+      </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" class="hidden flex flex-col lg:flex-row min-h-screen lg:h-screen w-full overflow-y-auto lg:overflow-hidden">
+      <!-- Player sections will be injected here -->
+    </div>
+
+    <!-- Winner Screen -->
+    <div id="winner-screen" class="hidden flex flex-col items-center justify-center min-h-screen p-4 bg-slate-950/95 fixed inset-0 z-50 overflow-y-auto">
+      <div class="glass p-6 md:p-12 max-w-2xl w-full text-center relative overflow-hidden my-8">
+        <div id="confetti-container"></div>
+        <h2 class="text-3xl md:text-5xl font-bold mb-6 md:mb-8 text-white">BATTLE RESULTS</h2>
+        
+        <div id="rankings" class="space-y-4 md:space-y-6 mb-8 md:mb-10">
+          <!-- Rankings will be injected here -->
+        </div>
+
+        <button onclick="location.reload()" class="w-full md:w-auto px-10 py-4 glass border border-violet-500 hover:bg-violet-500/20 rounded-xl font-bold transition-all">
+          YANA O'YNAYMIZ!
+        </button>
+      </div>
+    </div>
+
+    <script>
+      const AVATARS = [
+        { id: 'cat', emoji: '🐱', color: '#fbbf24' },
+        { id: 'lion', emoji: '🦁', color: '#f59e0b' },
+        { id: 'panda', emoji: '🐼', color: '#ffffff' },
+        { id: 'fox', emoji: '🦊', color: '#f97316' },
+        { id: 'rabbit', emoji: '🐰', color: '#f472b6' },
+        { id: 'koala', emoji: '🐨', color: '#94a3b8' },
+        { id: 'tiger', emoji: '🐯', color: '#fb923c' },
+        { id: 'frog', emoji: '🐸', color: '#4ade80' }
+      ];
+
+      const QUESTIONS = [
+        { q: "Fransiyaning poytaxti qaysi shahar?", a: ["London", "Berlin", "Parij", "Madrid"], c: 2 },
+        { q: "Qaysi sayyora 'Qizil sayyora' deb ataladi?", a: ["Venera", "Mars", "Yupiter", "Saturn"], c: 1 },
+        { q: "15 x 4 necha bo'ladi?", a: ["45", "50", "60", "75"], c: 2 },
+        { q: "Eng tez yuguradigan quruqlik hayvoni?", a: ["Sher", "Gepard", "Ot", "Burgut"], c: 1 },
+        { q: "Yer yuzida nechta qit'a bor?", a: ["5", "6", "7", "8"], c: 2 },
+        { q: "Oltinning kimyoviy belgisi nima?", a: ["Ag", "Fe", "Au", "Pb"], c: 2 },
+        { q: "64 ning kvadrat ildizi nechaga teng?", a: ["6", "7", "8", "9"], c: 2 },
+        { q: "Kamalakda nechta rang bor?", a: ["5", "6", "7", "8"], c: 2 }
+      ];
+
+      let playerCount = 2;
+      let players = [];
+      let gameActive = false;
+
+      // Audio Context for sound effects
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      function playSound(freq, type = 'sine', duration = 0.1) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      }
+
+      function initPlayerInputs() {
+        const container = document.getElementById('player-inputs');
+        container.innerHTML = '';
+        players = []; // Reset players array
+        for (let i = 0; i < playerCount; i++) {
+          const div = document.createElement('div');
+          div.className = 'glass p-4 md:p-6 text-left border-t-4 border-violet-500';
+          div.innerHTML = `
+            <label class="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">${i + 1}-O'yinchi ismi</label>
+            <input type="text" id="p${i}-name" value="O'yinchi ${i + 1}" class="w-full bg-slate-900/50 border border-slate-700 rounded-lg p-3 mb-4 focus:outline-none focus:border-violet-500 transition-all text-sm">
+            <label class="block text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">Avatar tanlang</label>
+            <div class="grid grid-cols-4 gap-2" id="p${i}-avatars">
+              ${AVATARS.map(av => `
+                <button onclick="selectAvatar(${i}, '${av.id}')" id="p${i}-av-${av.id}" class="text-xl md:text-2xl p-2 rounded-lg hover:bg-white/10 transition-all ${av.id === AVATARS[i].id ? 'bg-violet-500/30 border border-violet-500' : ''}">
+                  ${av.emoji}
+                </button>
+              `).join('')}
+            </div>
+          `;
+          container.appendChild(div);
+          players[i] = {
+            name: `O'yinchi ${i + 1}`,
+            avatar: AVATARS[i],
+            score: 0,
+            answered: false,
+            currentQuestionIndex: 0,
+            timer: 15,
+            finished: false,
+            questions: [...QUESTIONS].sort(() => Math.random() - 0.5)
+          };
+        }
+      }
+
+      function setPlayerCount(count) {
+        playerCount = count;
+        document.getElementById('btn-2p').classList.toggle('border-violet-500', count === 2);
+        document.getElementById('btn-2p').classList.toggle('border-slate-700', count !== 2);
+        document.getElementById('btn-3p').classList.toggle('border-violet-500', count === 3);
+        document.getElementById('btn-3p').classList.toggle('border-slate-700', count !== 3);
+        initPlayerInputs();
+      }
+
+      function selectAvatar(playerIdx, avatarId) {
+        const avatar = AVATARS.find(a => a.id === avatarId);
+        players[playerIdx].avatar = avatar;
+        
+        AVATARS.forEach(av => {
+          const btn = document.getElementById(`p${playerIdx}-av-${av.id}`);
+          btn.className = `text-xl md:text-2xl p-2 rounded-lg hover:bg-white/10 transition-all ${av.id === avatarId ? 'bg-violet-500/30 border border-violet-500' : ''}`;
+        });
+      }
+
+      function startGame() {
+        for (let i = 0; i < playerCount; i++) {
+          players[i].name = document.getElementById(`p${i}-name`).value || `${i+1}-O'yinchi`;
+        }
+        
+        document.getElementById('setup-screen').classList.add('hidden');
+        document.getElementById('game-screen').classList.remove('hidden');
+        
+        renderGameLayout();
+        gameActive = true;
+        
+        players.forEach((_, i) => updatePlayerQuestion(i));
+        startGlobalTimer();
+      }
+
+      function renderGameLayout() {
+        const container = document.getElementById('game-screen');
+        container.innerHTML = '';
+        players.forEach((p, i) => {
+          const section = document.createElement('div');
+          section.id = `player-section-${i}`;
+          section.className = `player-section flex-1 border-b lg:border-b-0 lg:border-r border-white/10 flex flex-col p-4 md:p-6 last:border-r-0 last:border-b-0 min-h-[50vh] lg:min-h-0`;
+          section.innerHTML = `
+            <div class="flex items-center justify-between mb-4 md:mb-8">
+              <div class="flex items-center gap-3 md:gap-4">
+                <div class="text-3xl md:text-5xl avatar-bounce">${p.avatar.emoji}</div>
+                <div>
+                  <h3 class="text-base md:text-xl font-bold truncate max-w-[100px] md:max-w-none">${p.name}</h3>
+                  <div class="text-violet-400 font-mono font-bold text-xl md:text-2xl" id="p${i}-score">0</div>
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="text-[10px] md:text-sm text-slate-400 uppercase font-bold">Vaqt</div>
+                <div class="text-xl md:text-3xl font-mono font-bold" id="p${i}-timer">15</div>
+              </div>
+            </div>
+            
+            <div class="w-full bg-white/5 h-1.5 md:h-2 rounded-full mb-6 md:mb-12 overflow-hidden">
+              <div id="p${i}-timer-bar" class="timer-bar h-full bg-gradient-to-r from-violet-500 to-pink-500 w-full"></div>
+            </div>
+
+            <div class="flex-1 flex flex-col justify-center max-w-xl mx-auto w-full" id="p${i}-content">
+              <div class="glass p-4 md:p-8 mb-4 md:mb-8 text-center min-h-[80px] md:min-h-[120px] flex items-center justify-center">
+                <h2 class="text-lg md:text-2xl font-bold leading-tight" id="p${i}-question"></h2>
+              </div>
+              
+              <div class="grid grid-cols-1 gap-2 md:gap-4" id="p${i}-answers">
+                <!-- Answers injected here -->
+              </div>
+            </div>
+
+            <div id="p${i}-feedback" class="mt-4 md:mt-8 text-center h-8 md:h-12 flex items-center justify-center font-bold text-lg md:text-xl"></div>
+          `;
+          container.appendChild(section);
+        });
+      }
+
+      function updatePlayerQuestion(playerIdx) {
+        const p = players[playerIdx];
+        if (p.currentQuestionIndex >= p.questions.length) {
+          p.finished = true;
+          document.getElementById(`p${playerIdx}-content`).innerHTML = `
+            <div class="glass p-6 md:p-12 text-center">
+              <div class="text-4xl md:text-6xl mb-4">🏁</div>
+              <h2 class="text-xl md:text-3xl font-bold mb-2">TAMOM!</h2>
+              <p class="text-xs md:text-sm text-slate-400">Boshqalarni kutyapmiz...</p>
+            </div>
+          `;
+          checkGameEnd();
+          return;
+        }
+
+        const q = p.questions[p.currentQuestionIndex];
+        p.answered = false;
+        p.timer = 15;
+        
+        document.getElementById(`p${playerIdx}-question`).innerText = q.q;
+        const answersContainer = document.getElementById(`p${playerIdx}-answers`);
+        answersContainer.innerHTML = '';
+        
+        q.a.forEach((ans, ansIdx) => {
+          const btn = document.createElement('button');
+          btn.className = 'answer-btn glass p-3 md:p-5 text-left border border-white/10 rounded-xl md:rounded-2xl hover:bg-white/10 transition-all font-medium text-sm md:text-lg flex items-center gap-3 md:gap-4';
+          btn.innerHTML = `<span class="w-6 h-6 md:w-8 md:h-8 rounded-full bg-white/10 flex items-center justify-center text-[10px] md:text-sm font-bold">${String.fromCharCode(65 + ansIdx)}</span> ${ans}`;
+          btn.onclick = () => handleAnswer(playerIdx, ansIdx);
+          answersContainer.appendChild(btn);
+        });
+
+        document.getElementById(`p${playerIdx}-feedback`).innerHTML = '';
+        document.getElementById(`player-section-${playerIdx}`).classList.remove('correct-flash', 'wrong-flash');
+      }
+
+      let timerInterval;
+      function startGlobalTimer() {
+        clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+          players.forEach((p, i) => {
+            if (!p.answered && !p.finished) {
+              p.timer -= 0.1;
+              if (p.timer <= 0) {
+                p.timer = 0;
+                handleAnswer(i, -1);
+              }
+              document.getElementById(`p${i}-timer`).innerText = Math.ceil(p.timer);
+              document.getElementById(`p${i}-timer-bar`).style.width = `${(p.timer / 15) * 100}%`;
+            }
+          });
+        }, 100);
+      }
+
+      function handleAnswer(playerIdx, answerIdx) {
+        const p = players[playerIdx];
+        if (p.answered || p.finished) return;
+        
+        p.answered = true;
+        const q = p.questions[p.currentQuestionIndex];
+        const isCorrect = answerIdx === q.c;
+        const section = document.getElementById(`player-section-${playerIdx}`);
+        const feedback = document.getElementById(`p${playerIdx}-feedback`);
+        
+        const buttons = document.getElementById(`p${playerIdx}-answers`).querySelectorAll('button');
+        buttons.forEach((btn, idx) => {
+          btn.disabled = true;
+          if (idx === q.c) {
+            btn.classList.add('border-green-500', 'bg-green-500/20');
+          } else if (idx === answerIdx) {
+            btn.classList.add('border-red-500', 'bg-red-500/20');
+          }
+        });
+
+        if (isCorrect) {
+          const speedBonus = Math.floor(p.timer * 10);
+          const basePoints = 100;
+          const totalPoints = basePoints + speedBonus;
+          p.score += totalPoints;
+          document.getElementById(`p${playerIdx}-score`).innerText = p.score;
+          
+          section.classList.add('correct-flash');
+          feedback.innerHTML = `<span class="text-green-400 text-sm md:text-xl">TO'G'RI! +${totalPoints}</span>`;
+          playSound(880, 'sine', 0.1);
+          setTimeout(() => playSound(1109, 'sine', 0.1), 50);
+        } else {
+          section.classList.add('wrong-flash');
+          feedback.innerHTML = `<span class="text-red-400 text-sm md:text-xl">${answerIdx === -1 ? 'VAQT TUGADI!' : 'XATO!'}</span>`;
+          playSound(220, 'sawtooth', 0.2);
+        }
+
+        setTimeout(() => {
+          p.currentQuestionIndex++;
+          updatePlayerQuestion(playerIdx);
+        }, 1500);
+      }
+
+      function checkGameEnd() {
+        if (players.every(p => p.finished)) {
+          clearInterval(timerInterval);
+          setTimeout(endGame, 1000);
+        }
+      }
+
+      function endGame() {
+        gameActive = false;
+        document.getElementById('game-screen').classList.add('hidden');
+        document.getElementById('winner-screen').classList.remove('hidden');
+        
+        const sorted = [...players].sort((a, b) => b.score - a.score);
+        const rankings = document.getElementById('rankings');
+        rankings.innerHTML = '';
+        
+        sorted.forEach((p, i) => {
+          const div = document.createElement('div');
+          div.className = `glass p-4 md:p-6 flex items-center justify-between ${i === 0 ? 'border-2 border-yellow-500 neon-glow scale-105 md:scale-110 mb-4 md:mb-8' : 'border border-white/10'}`;
+          div.innerHTML = `
+            <div class="flex items-center gap-3 md:gap-6">
+              <div class="text-2xl md:text-4xl font-bold text-slate-400 w-6 md:w-8">${i + 1}</div>
+              <div class="text-3xl md:text-5xl">${p.avatar.emoji}</div>
+              <div class="text-left">
+                <div class="text-lg md:text-2xl font-bold truncate max-w-[100px] md:max-w-none">${p.name}</div>
+                <div class="text-[10px] md:text-sm text-slate-400 uppercase font-bold tracking-widest">${i === 0 ? '👑 G\'olib' : 'Ishtirokchi'}</div>
+              </div>
+            </div>
+            <div class="text-xl md:text-3xl font-mono font-bold text-violet-400">${p.score}</div>
+          `;
+          rankings.appendChild(div);
+        });
+
+        createConfetti();
+      }
+
+      function createConfetti() {
+        const container = document.getElementById('confetti-container');
+        const colors = ['#8b5cf6', '#ec4899', '#3b82f6', '#10b981', '#f59e0b'];
+        for (let i = 0; i < 100; i++) {
+          const c = document.createElement('div');
+          c.className = 'confetti';
+          c.style.left = Math.random() * 100 + 'vw';
+          c.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+          c.style.animationDelay = Math.random() * 2 + 's';
+          c.style.opacity = Math.random();
+          container.appendChild(c);
+        }
+      }
+
+      setPlayerCount(2);
+    </script>
+  </body>
+</html>
+
